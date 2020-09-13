@@ -1,72 +1,65 @@
 import {
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common'
-import { options } from '../config/hash.config'
 import * as argon2 from 'argon2'
-import { InjectModel } from '@nestjs/mongoose'
+import { UsersService } from '../users/users.service'
 import { User } from '../users/users.model'
-import { Model } from 'mongoose'
+import { JwtService } from '@nestjs/jwt'
+import { RouterExecutionContext } from '@nestjs/core/router/router-execution-context'
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectModel('User') private readonly userModel: Model<User>) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  async register(
+  /*async register(
     name: string,
     bio: string,
     nickname: string,
     email: string,
     password: string,
   ): Promise<User> {
-    try {
-      const newPassword = await argon2.hash(password, options)
-      const newUser = new this.userModel({
-        name,
-        bio,
-        nickname,
-        email,
-        password: newPassword,
-      })
-      const savedUser = await newUser.save()
-      return {
-        id: savedUser.id,
-        name: savedUser.name,
-        bio: savedUser.bio,
-        nickname: savedUser.nickname,
-        email: savedUser.email,
-      } as User
-    } catch (err) {
-      throw new InternalServerErrorException(
-        'An error has occurred while trying to register. Try again.',
-      )
-    }
-  }
+    return await
+  }*/
 
-  async login(email: string, password: string): Promise<User> {
-    let user
+  async validateUser(username: string, password: string): Promise<User> {
+    let user: User
     try {
-      user = await this.userModel.findOne({ email }, '+password').exec()
+      if (username.indexOf('@') === -1) {
+        user = await this.usersService.findByUsername(username)
+      } else {
+        user = await this.usersService.findByEmail(username)
+      }
 
       if (await argon2.verify(user.password, password)) {
         user.password = undefined
+        user.__v = undefined
       } else {
         user = undefined
       }
     } catch (err) {
-      throw new NotFoundException('Invalid e-mail or password')
+      throw new UnauthorizedException('Wrong username/e-mail or password')
     }
     if (!user) {
-      throw new NotFoundException('Invalid e-mail or password')
+      throw new UnauthorizedException('Wrong username/e-mail or password')
     }
 
-    return {
-      id: user.id,
-      name: user.name,
-      bio: user.bio,
-      nickname: user.nickname,
+    return user
+  }
+
+  async login(user: User): Promise<any> {
+    const payload = {
+      username: user.username,
       email: user.email,
-    } as User
+      sub: user._id,
+    }
+    return {
+      access_token: this.jwtService.sign(payload),
+      ...user.toObject(),
+    }
   }
 }
