@@ -1,13 +1,8 @@
-import {
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import * as argon2 from 'argon2'
 import { UsersService } from '../users/users.service'
 import { User } from '../users/users.model'
 import { JwtService } from '@nestjs/jwt'
-import { RouterExecutionContext } from '@nestjs/core/router/router-execution-context'
 
 @Injectable()
 export class AuthService {
